@@ -15,32 +15,21 @@ lv_business = business_df.filter(business_df["city"] == "Las Vegas")
 #get just vegas restaurants
 lv_restaurants = lv_business.select("*").where("array_contains(categories,'Restaurants')")
 lv_restaurants.count()
-lv_vertices = lv_restaurants.select("business_id").withColumnRenamed("business_id","id").withColumn("type",lit("business"))
-
 #4658 #Add more categories?
 
-
-#load checkin data
-checkin = sqlContext.read.json("data/yelp_academic_dataset_checkin.json")
-
-#join las vegas restaurants to checkins
-restaurant_checkin = lv_restaurants.join(checkin_df,"business_id")
-
-#load review data
-review = sqlContext.read.json("data/yelp_academic_dataset_review.json")
-
-#join reviews to restaurants
-restaurant_review = lv_restaurants.join(review_df,"business_id")
+lv_vertices = lv_restaurants.select("business_id").withColumnRenamed("business_id","id").withColumn("type",lit("business"))
 
 #load user data
 user = sqlContext.read.json("data/yelp_academic_dataset_user.json")
 user.count()
 user_vertices = user.select("user_id").withColumnRenamed("user_id","id").withColumn("type",lit("user"))
 
+#vertices data frame
 vertices = user_vertices.unionAll(lv_vertices)
 
-#join users to checkins
-user_checkin_df = user_df.join(checkin_df,"user_id")
+#load review data
+review = sqlContext.read.json("data/yelp_academic_dataset_review.json")
+lv_reviews = review.join(lv_restaurants.select("business_id"),"business_id").select("business_id","user_id","stars","date")
 
-#join users to reviews
-user_checkin_df = user_df.join(checkin_df,"user_id")
+#edges data frame
+edges = lv_reviews.withColumnRenamed("user_id","src").withColumnRenamed("business_id","dst")
