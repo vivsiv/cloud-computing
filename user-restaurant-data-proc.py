@@ -21,16 +21,19 @@ lv_restaurants = lv_business.select("*").where("array_contains(categories,'Resta
 lv_vertices = lv_restaurants.select("business_id").withColumnRenamed("business_id","id").withColumn("type",lit("business"))
 
 #load user data
-user = sqlContext.read.json("data/yelp_academic_dataset_user.json")
+users = sqlContext.read.json("data/yelp_academic_dataset_user.json")
 #user.count()
-user_vertices = user.select("user_id").withColumnRenamed("user_id","id").withColumn("type",lit("user"))
+users_vertices = users.select("user_id").withColumnRenamed("user_id","id").withColumn("type",lit("user"))
 
-#vertices data frame
-vertices = user_vertices.unionAll(lv_vertices)
+#user-business graph vertices
+vertices = users_vertices.unionAll(lv_vertices)
 
 #load review data
 review = sqlContext.read.json("data/yelp_academic_dataset_review.json")
 lv_reviews = review.join(lv_restaurants.select("business_id"),"business_id").select("business_id","user_id","stars","date")
 
-#edges data frame
+#user-business graph edges
 edges = lv_reviews.withColumnRenamed("user_id","src").withColumnRenamed("business_id","dst")
+
+
+
