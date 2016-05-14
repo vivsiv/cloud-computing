@@ -2,11 +2,26 @@
 from pyspark.sql import SQLContext
 from graphframes import *
 
+sqlContext = SQLContext(sc)
+
 #load user data
 users = sqlContext.read.json("data/yelp_academic_dataset_user.json")
+#552339
 
+#load business data
+business = sqlContext.read.json("data/yelp_academic_dataset_business.json")
+#get just Vegas businesses
+lv_business = business.filter(business_df["city"] == "Las Vegas")
+#get just vegas restaurants
+lv_restaurants = lv_business.select("*").where("array_contains(categories,'Restaurants')")
+#load review data
+review = sqlContext.read.json("data/yelp_academic_dataset_review.json")
+#get user ids who have reviewed lv_businesses
+lv_user_ids = review.join(lv_restaurants.select("business_id"),"business_id").groupBy("user_id").count().select("user_id")
 #compute vertices
-vertices = users.select("user_id").withColumnRenamed("user_id","id")
+vertices = lv_user_ids.withColumnRenamed("user_id","id")
+#vertices.count()
+#174479
 
 #compute edges
 user_friends_pairs = users.map(lambda user: (user.user_id,user.friends))
