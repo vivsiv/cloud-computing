@@ -1,5 +1,7 @@
 from pyspark.sql import SQLContext
 from pyspark.sql.functions import lit
+from pyspark.sql.functions import udf
+from graphframes import *
 
 sqlContext = SQLContext(sc)
 
@@ -35,5 +37,22 @@ lv_reviews = review.join(lv_restaurants.select("business_id"),"business_id").sel
 #user-business graph edges
 edges = lv_reviews.withColumnRenamed("user_id","src").withColumnRenamed("business_id","dst")
 
+#### Cluster ####
+# find highest rating restaurants for each user
+g = GraphFrame(vertices, edges)
+gmax = g.edges.select("src","dst","stars").groupBy("src").max("stars")
+gmax = gmax.withColumnRenamed("max(stars)","max_stars")
+gjoin = g.edges.join(gmax,g.edges.src==gmax.src).select(g.edges.src,g.edges.dst,g.edges.stars,gmax.max_stars)
+gjoin = gjoin.filter("stars=max_stars")
 
+# find restaurants in the same clusters
+# 1. add to gjoin a column = list of restaurants in the same clusters
+def findSameCluster(rid):
+    ## code for finding restaurants in same clusters ##
 
+    ###
+    a = [1,2,3]
+    return a
+clusterFinder = udf(findSameCluster)
+lv_reviews.withColumn("candidate",clusterFinder(lv_reviews['business_id']))
+# 2. add the edges for these user-restaurant pairs
