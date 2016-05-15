@@ -1,8 +1,11 @@
 from pyspark.sql import SQLContext
 from pyspark.sql.functions import lit
 from pyspark.sql.functions import udf
+from pyspark.sql.types import *
 from graphframes import *
 from pyspark.mllib.clustering import KMeans, KMeansModel
+from numpy import array
+import random
 
 sqlContext = SQLContext(sc)
 
@@ -48,21 +51,53 @@ lv_reviews = review.join(lv_restaurants.select("business_id"),"business_id").sel
 edges = lv_reviews.withColumnRenamed("user_id","src").withColumnRenamed("business_id","dst")
 
 #### Cluster ####
+# create cluter for testing use
+num_of_clusters = 10
+test = lv_clustering_data.select("stars","price_range")
+clusters = KMeans.train(test.dropna().map(list), num_of_clusters, maxIterations=10, runs=10,initializationMode="random")
+
 # find highest rating restaurants for each user
 g = GraphFrame(vertices, edges)
-gmax = g.edges.select("src","dst","stars").groupBy("src").max("stars")
-gmax = gmax.withColumnRenamed("max(stars)","max_stars")
-gjoin = g.edges.join(gmax,g.edges.src==gmax.src).select(g.edges.src,g.edges.dst,g.edges.stars,gmax.max_stars)
-gjoin = gjoin.filter("stars=max_stars")
+gmax = g.edges.select("src","dst","stars").groupBy("src").max("stars").withColumnRenamed("max(stars)","max_stars")
+gjoin = g.edges.join(gmax,g.edges.src==gmax.src).select(g.edges.src,g.edges.dst,g.edges.stars,gmax.max_stars).filter("stars=max_stars").dropDuplicates(['src'])
 
-# find restaurants in the same clusters
-# 1. add to gjoin a column = list of restaurants in the same clusters
-def findSameCluster(rid):
-    ## code for finding restaurants in same clusters ##
+# add restaurant feature vectors to edge
+gjoin_restaurant_info = gjoin.join(lv_clustering_data,gjoin.dst==lv_clustering_data.business_id).select(gjoin.src,gjoin.dst,gjoin.max_stars,lv_clustering_data.neighborhood,lv_clustering_data.price_range,lv_clustering_data.stars)
+def addCluster(stars,price_range): return clusters.predict(array([stars,price_range]))
+clusterAdder = udf(addCluster,IntegerType())
+g_all = gjoin_restaurant_info.withColumn("cluster_id", clusterAdder(gjoin_restaurant_info['stars'],gjoin_restaurant_info['price_range']))
+lv_all = lv_clustering_data.withColumn("cluster_id", clusterAdder(lv_clustering_data['stars'],lv_clustering_data['price_range']))
 
-    ###
-    a = [1,2,3]
-    return a
-clusterFinder = udf(findSameCluster)
-lv_reviews.withColumn("candidate",clusterFinder(lv_reviews['business_id']))
+###### runnable ########
+# construct cluster index
+cluster_index = {}
+for i in range(num_of_clusters):
+	cluster_index[i] = lv_all.filter(lv_all.cluster_id == i).select("business_id").map(lambda r: r.business_id).collect()
+
+def addPrediction(cluster_id): return random.choice(cluster_index[cluster_id])
+predictionAdder = udf(addPrediction, StringType())
+g_all = g_all.withColumn("predict_dst", predictionAdder(g_all['cluster_id']))
+
+new_edges = g_all.select("src","predict_dst").withColumnRenamed("predict_dst","dst")
+
+# get list of all restaurants
+# candidates = lv_reviews.select("business_id").dropDuplicates().map(lambda r: r.business_id).collect() #4658
+#
+# # add a candidate column to gjoin_restaurant_info
+# def addCandidate(arg): return candidates
+# candidateAdder = udf(addCandidate,ArrayType(StringType()))
+# g_edge_all = gjoin_restaurant_info.withColumn("candidates", candidateAdder(gjoin_restaurant_info['src']))
+#
+# # find restaurants in the same clusters
+# def findSameCluster(row):
+#     fv1 = array([row.stars,row.price_range])
+#     def f(c):
+#         r = lv_clustering_data.filter(lv_clustering_data.business_id==c).select("stars","price_range").first()
+#         fv2 = array([r.stars,r.price_range])
+#         return clusters.predict(fv1) == clusters.predict(fv2)
+#     filter(f,row.candidates)
+#
+# g_edge_all.foreach(findSameCluster)
+
+
 # 2. add the edges for these user-restaurant pairs
