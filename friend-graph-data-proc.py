@@ -11,7 +11,7 @@ users = sqlContext.read.json("data/yelp_academic_dataset_user.json")
 #load business data
 business = sqlContext.read.json("data/yelp_academic_dataset_business.json")
 #get just Vegas businesses
-lv_business = business.filter(business_df["city"] == "Las Vegas")
+lv_business = business.filter(business["city"] == "Las Vegas")
 #get just vegas restaurants
 lv_restaurants = lv_business.select("*").where("array_contains(categories,'Restaurants')")
 #load review data
@@ -35,5 +35,5 @@ friend_graph = GraphFrame(vertices, edges)
 # friend_graph.vertices.show()
 # friend_graph.edges.show()
 
-#cc = friend_graph.connectedComponents().vertices
+cc = friend_graph.connectedComponents()
 
