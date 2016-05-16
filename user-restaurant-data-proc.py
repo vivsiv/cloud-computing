@@ -3,8 +3,7 @@ from pyspark.sql.functions import lit
 from pyspark.sql.functions import udf
 from graphframes import *
 from pyspark.mllib.clustering import KMeans, KMeansModel
-# from pyspark.ml.feature import VectorIndexer
-from pyspark.ml.feature import OneHotEncoder, StringIndexer
+from pyspark.ml.feature import OneHotEncoder, StringIndexer, VectorAssembler
 
 sqlContext = SQLContext(sc)
 
@@ -23,11 +22,16 @@ lv_clustering_data = lv_restaurants.map(lambda r:
 	).toDF(['business_id','neighborhood','stars','price_range'])
 
 #Neighborhood feature engineering
-stringIndexer = StringIndexer(inputCol="neighborhood", outputCol="neighborhoodIndex")
+stringIndexer = StringIndexer(inputCol="neighborhood", outputCol="neigh_index")
 lv_model = stringIndexer.fit(lv_clustering_data)
 lv_indexed = lv_model.transform(lv_clustering_data)
-encoder = OneHotEncoder(dropLast=False, inputCol="neighborhoodIndex", outputCol="neighborhoodVec")
+encoder = OneHotEncoder(dropLast=False, inputCol="neigh_index", outputCol="neigh_vec")
 lv_encoded = encoder.transform(lv_indexed)
+
+assembler = VectorAssembler(
+    inputCols=["stars", "price_range", "neigh_vec"],
+    outputCol="features_vec")
+lv_assembled = assembler.transform(lv_encoded)
 
 
 # neighborhoods = lv_clustering_data.groupBy("neighborhood").count().select("neighborhood").collect()
