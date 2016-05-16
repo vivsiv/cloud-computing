@@ -21,23 +21,36 @@ lv_restaurants = lv_business.select("*").where("array_contains(categories,'Resta
 
 #get vegas clustering data
 lv_clustering_data = lv_restaurants.map(lambda r:
-		[r.business_id,"N/A" if len(r.neighborhoods) is 0 else r.neighborhoods[0],r.stars,r.attributes['Price Range']]
+		[r.business_id,"None" if len(r.neighborhoods) is 0 else r.neighborhoods[0],r.stars,r.attributes['Price Range']]
 	).toDF(['business_id','neighborhood','stars','price_range'])
 
 #Neighborhood feature engineering
-stringIndexer = StringIndexer(inputCol="neighborhood", outputCol="neigh_index")
-lv_model = stringIndexer.fit(lv_clustering_data)
-lv_indexed = lv_model.transform(lv_clustering_data)
-encoder = OneHotEncoder(dropLast=False, inputCol="neigh_index", outputCol="neigh_vec")
-lv_encoded = encoder.transform(lv_indexed)
+# stringIndexer = StringIndexer(inputCol="neighborhood", outputCol="neigh_index")
+# lv_model = stringIndexer.fit(lv_clustering_data)
+# lv_indexed = lv_model.transform(lv_clustering_data)
+# encoder = OneHotEncoder(dropLast=False, inputCol="neigh_index", outputCol="neigh_vec")
+# lv_encoded = encoder.transform(lv_indexed)
 
-assembler = VectorAssembler(
-    inputCols=["stars", "price_range", "neigh_vec"],
-    outputCol="features_vec")
-lv_assembled = assembler.transform(lv_encoded)
+# assembler = VectorAssembler(
+#     inputCols=["stars", "price_range", "neigh_vec"],
+#     outputCol="features_vec")
+# lv_assembled = assembler.transform(lv_encoded)
 
 
-# neighborhoods = lv_clustering_data.groupBy("neighborhood").count().select("neighborhood").collect()
+
+neighborhoods = lv_clustering_data.groupBy("neighborhood").count().select("neighborhood").collect()
+for n in neighborhoods:
+	statement = "SELECT *, neighborhood='{0}' AS {0} FROM __THIS__".format(n['neighborhood'].replace(" ","_"))
+	sqlTrans = SQLTransformer(statement=statement)
+	lv_clustering_data = sqlTrans.transform(lv_clustering_data)
+
+
+
+
+#statement = "SELECT *, neighborhood='Eastside' AS Eastside FROM __THIS__"
+
+
+
 
 # for n in neighborhoods:
 # 	lv_clustering_data = lv_clustering_data.withColumn(n['neighborhood'],lit(False))
