@@ -41,6 +41,9 @@ for n in neighborhoods:
 	sqlTrans = SQLTransformer(statement=statement)
 	lv_clustering_data = sqlTrans.transform(lv_clustering_data)
 
+col_drop_list = ['business_id', 'neighborhood']
+lv_clustering = lv_clustering_data.select([column for column in lv_clustering_data.columns if column not in col_drop_list])
+
 
 #generate lv_restaurant vertices set
 lv_vertices = lv_restaurants.select("business_id").withColumnRenamed("business_id","id").withColumn("type",lit("business"))
