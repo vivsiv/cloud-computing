@@ -6,6 +6,7 @@ from graphframes import *
 from pyspark.mllib.clustering import KMeans, KMeansModel
 from numpy import array
 import random
+from pyspark.ml.feature import OneHotEncoder, StringIndexer, VectorAssembler
 
 sqlContext = SQLContext(sc)
 
@@ -24,11 +25,24 @@ lv_clustering_data = lv_restaurants.map(lambda r:
 	).toDF(['business_id','neighborhood','stars','price_range'])
 
 #Neighborhood feature engineering
-neighborhoods = lv_clustering_data.groupBy("neighborhood").count().select("neighborhood")
-# def n_map(data,n):
-# 	data = data.withColumn(n,False)
+stringIndexer = StringIndexer(inputCol="neighborhood", outputCol="neigh_index")
+lv_model = stringIndexer.fit(lv_clustering_data)
+lv_indexed = lv_model.transform(lv_clustering_data)
+encoder = OneHotEncoder(dropLast=False, inputCol="neigh_index", outputCol="neigh_vec")
+lv_encoded = encoder.transform(lv_indexed)
 
-# neighborhoods.map(n_map(lv_clustering_data))
+assembler = VectorAssembler(
+    inputCols=["stars", "price_range", "neigh_vec"],
+    outputCol="features_vec")
+lv_assembled = assembler.transform(lv_encoded)
+
+
+# neighborhoods = lv_clustering_data.groupBy("neighborhood").count().select("neighborhood").collect()
+
+# for n in neighborhoods:
+# 	lv_clustering_data = lv_clustering_data.withColumn(n['neighborhood'],lit(False))
+
+
 
 #generate lv_restaurant vertices set
 lv_vertices = lv_restaurants.select("business_id").withColumnRenamed("business_id","id").withColumn("type",lit("business"))
