@@ -94,6 +94,9 @@ g_all = g_all.withColumn("predict_dst", predictionAdder(g_all['cluster_id']))
 
 new_edges = g_all.select("src","predict_dst").withColumnRenamed("predict_dst","dst")
 
+# todo
+# filter out the restaurants the user has already visited
+
 # get list of all restaurants
 # candidates = lv_reviews.select("business_id").dropDuplicates().map(lambda r: r.business_id).collect() #4658
 #

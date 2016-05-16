@@ -11,6 +11,7 @@ vertices = sqlContext.createDataFrame([
 
 edges = sqlContext.createDataFrame([
   ("18kPq7GPye-YQ3LyKyAZPw", "zMN8UGd1zDEreT58OCdnyg", 5, "2012-08-01"),
+  ("18kPq7GPye-YQ3LyKyAZPw", "zMN8UGd1zDEreT58OCdnyg", 5, "2012-08-01")
 ], ["src", "dst", "stars", "date"])
 
 # generate user-restaurant graph

@@ -37,3 +37,4 @@ friend_graph = GraphFrame(vertices, edges)
 
 cc = friend_graph.connectedComponents()
 
+#cc = friend_graph.connectedComponents().vertices
