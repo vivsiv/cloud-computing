@@ -3,7 +3,7 @@ from pyspark.sql.functions import lit
 from pyspark.sql.functions import udf
 from graphframes import *
 from pyspark.mllib.clustering import KMeans, KMeansModel
-from pyspark.ml.feature import OneHotEncoder, StringIndexer, VectorAssembler
+from pyspark.ml.feature import OneHotEncoder, StringIndexer, VectorAssembler, SQLTransformer
 
 sqlContext = SQLContext(sc)
 
@@ -40,18 +40,6 @@ for n in neighborhoods:
 	statement = "SELECT *, neighborhood='{0}' AS {0} FROM __THIS__".format(n['neighborhood'].replace(" ","_"))
 	sqlTrans = SQLTransformer(statement=statement)
 	lv_clustering_data = sqlTrans.transform(lv_clustering_data)
-
-
-
-
-#statement = "SELECT *, neighborhood='Eastside' AS Eastside FROM __THIS__"
-
-
-
-
-# for n in neighborhoods:
-# 	lv_clustering_data = lv_clustering_data.withColumn(n['neighborhood'],lit(False))
-
 
 
 #generate lv_restaurant vertices set
