@@ -6,7 +6,7 @@ from graphframes import *
 from pyspark.mllib.clustering import KMeans, KMeansModel
 from numpy import array
 import random
-from pyspark.ml.feature import OneHotEncoder, StringIndexer, VectorAssembler
+from pyspark.ml.feature import OneHotEncoder, StringIndexer, VectorAssembler, SQLTransformer
 
 sqlContext = SQLContext(sc)
 
@@ -44,17 +44,8 @@ for n in neighborhoods:
 	sqlTrans = SQLTransformer(statement=statement)
 	lv_clustering_data = sqlTrans.transform(lv_clustering_data)
 
-
-
-
-#statement = "SELECT *, neighborhood='Eastside' AS Eastside FROM __THIS__"
-
-
-
-
-# for n in neighborhoods:
-# 	lv_clustering_data = lv_clustering_data.withColumn(n['neighborhood'],lit(False))
-
+col_drop_list = ['business_id', 'neighborhood']
+lv_clustering = lv_clustering_data.select([column for column in lv_clustering_data.columns if column not in col_drop_list])
 
 
 #generate lv_restaurant vertices set
