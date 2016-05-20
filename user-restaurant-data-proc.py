@@ -20,9 +20,40 @@ lv_restaurants = lv_business.select("*").where("array_contains(categories,'Resta
 #4658 #Add more categories?
 
 #get vegas clustering data
+
+#initial feature set
+# lv_clustering_data = lv_restaurants.map(lambda r:
+# 		[r.business_id, "None" if len(r.neighborhoods) is 0 else r.neighborhoods[0], r.stars, r.attributes['Price Range']]
+# 	).toDF(['business_id','neighborhood','stars','price_range'])
+
+
+#expanded feature set
+clustering_columns = ['business_id',
+			'neighborhood',
+			'stars',
+			'price_range',
+			'dinner',
+			'lunch',
+			'breakfast',
+			'romantic',
+			'upscale',
+			'casual',
+			'alcohol',
+			'take_out']
+
 lv_clustering_data = lv_restaurants.map(lambda r:
-		[r.business_id,"None" if len(r.neighborhoods) is 0 else r.neighborhoods[0],r.stars,r.attributes['Price Range']]
-	).toDF(['business_id','neighborhood','stars','price_range'])
+		[r.business_id,
+		 "None" if len(r.neighborhoods) is 0 else r.neighborhoods[0], 
+		 r.stars, r.attributes['Price Range'], 
+		 False if r.attributes['Good For'] is None else r.attributes['Good For']['dinner'],
+		 False if r.attributes['Good For'] is None else r.attributes['Good For']['lunch'],
+		 False if r.attributes['Good For'] is None else r.attributes['Good For']['breakfast'],
+		 False if r.attributes['Ambience'] is None else r.attributes['Ambience']['romantic'],
+		 False if r.attributes['Ambience'] is None else r.attributes['Ambience']['upscale'],
+		 False if r.attributes['Ambience'] is None else r.attributes['Ambience']['casual'],
+		 False if (r.attributes['Alcohol'] is None or r.attributes['Alcohol'] == 'none') else True,
+		 False if r.attributes['Take-out'] is None else r.attributes['Take-out']]
+	).toDF(clustering_columns)
 
 # drop row with null values
 lv_clustering_data = lv_clustering_data.dropna()
@@ -34,9 +65,18 @@ lv_indexed = lv_model.transform(lv_clustering_data)
 encoder = OneHotEncoder(dropLast=False, inputCol="neigh_index", outputCol="neigh_vec")
 lv_encoded = encoder.transform(lv_indexed)
 
+#initial feature set
+# assembler = VectorAssembler(
+#     inputCols=["stars", "price_range", "neigh_vec"],
+#     outputCol="features_vec")
+
+#expanded feature set
+feature_columns = clustering_columns[2:]
+feature_columns.append("neigh_vec")
 assembler = VectorAssembler(
-    inputCols=["stars", "price_range", "neigh_vec"],
+    inputCols=feature_columns,
     outputCol="features_vec")
+
 lv_assembled = assembler.transform(lv_encoded)
 
 
