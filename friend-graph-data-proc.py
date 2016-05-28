@@ -54,59 +54,34 @@ business_vertices = users_vertices.unionAll(lv_vertices)
 business_edges = lv_reviews.withColumnRenamed("user_id","src").withColumnRenamed("business_id","dst")
 business_graph = GraphFrame(business_vertices, business_edges)
 
+### MOST INFLUENTIAL USERS LINK PREDICTION ###
+num_friends = friend_graph.inDegrees
+most_pop_users = num_friends.sort(col("inDegree").desc()).limit(100)
+most_pop_rest = lv_reviews.join(most_pop_users.select("id"), most_pop_users.id == lv_reviews.user_id).select("business_id","user_id","stars","date")
+divide_point = int(round(most_pop_rest.count() * 0.5))
+most_pop_rest1 = sqlContext.createDataFrame(most_pop_rest.orderBy("date").collect()[:divide_point])
 
-user_friends_pairs_df = users.map(lambda user: (user.user_id,user.friends)).toDF(['user_id','friends'])
+most_pop_rest1_arr = most_pop_rest1.select("business_id").map(lambda r: r.business_id).collect()
+def addPrediction(arg): return random.choice(most_pop_rest1_arr)
+predictionAdder = udf(addPrediction, StringType())
+business_graph_new = business_graph.edges.withColumn("predict_dst", predictionAdder(business_graph.edges['src']))
+business_graph_predictions = business_graph_new.select("src","predict_dst").withColumnRenamed("predict_dst","dst")
 
-user_random_friend_df = user_friends_pairs_df.map(lambda user: (user.user_id, None if len(user.friends) == 0 else random.choice(user.friends))).toDF(['user_id','friend_id'])
-user_random_friend_df = user_random_friend_df.filter(user_random_friend_df['friend_id'] != 'null')
-
-def randomBusiness(friend_id):
-	business_ids = lv_reviews.filter(lv_reviews['user_id'] == friend_id).select('business_id')
-	return random.choice(business_ids.map(lambda b: b.business_id).collect())
-
-randomBusinessUDF = udf(randomBusiness, StringType())
-
-predictions_df = user_random_friend_df.map(randomBusinessUDF(user_random_friend_df['friend_id']))
 
 ### SOCIAL NETWORK LINK PREDICTION ###
-# result = friend_graph.stronglyConnectedComponents(maxIter=10)
+# user_friends_pairs_df = users.map(lambda user: (user.user_id,user.friends)).toDF(['user_id','friends'])
+# predictions = {}
+# users_to_predict = user_friends_pairs_df.limit(10).collect()
+# for user in users_to_predict:
+# 	restaurants = []
+# 	for friend in user.friends:
+# 		business_ids = lv_reviews.filter(lv_reviews['user_id'] == friend).select('business_id')
+# 		restaurants.append(business_ids.map(lambda b: b.business_id).collect())
+# 	if len(restaurants) > 0:
+# 		predictions[user.user_id] = random.choice(restaurants)
 
-# component_index = {}
-# for i in range(result.groupBy("component").max("component")):
-# 	cluster_index[i] = lv_all.filter(lv_all.cluster_id == i).select("business_id").map(lambda r: r.business_id).collect()
-# 	lv_all = lv_all.filter(lv_all.cluster_id != i)
+# def addPrediction(user_id): return prediction[user_id]
+# predictionAdder = udf(addPrediction, StringType())
 
-
-predictions = {}
-users_to_predict = user_friends_pairs_df.limit(10).collect()
-for user in users_to_predict:
-	restaurants = []
-	for friend in user.friends:
-		business_ids = lv_reviews.filter(lv_reviews['user_id'] == friend).select('business_id')
-		restaurants.append(business_ids.map(lambda b: b.business_id).collect())
-	if len(restaurants) > 0:
-		predictions[user.user_id] = random.choice(restaurants)
-
-def addPrediction(user_id): return prediction[user_id]
-predictionAdder = udf(addPrediction, StringType())
-
-business_graph = business_graph.withColumn("predict_dst",predictionAdder(business_graph['user_id']))
-new_edges = business_graph.select("src","predict_dst").withColumnRenamed("predict_dst","dst")
-	#get users friends to data frame
-	#get links for each user to restaurant in business graph
-	#choose a restaurant from set and predict link
-
-
-inDeg = friend_graph.inDegrees
-mostPopular = inDeg.sort(col("inDegree").desc()).limit(100)
-mostPop_rest = lv_reviews.join(b.select("id"), mostPopular.id == lv_reviews.user_id).select("business_id","user_id","stars","date")
-trainNum = int(round(mostPop_rest.count() * 0.5))
-mostPop_first_half = sqlContext.createDataFrame(mostPop_rest.orderBy("date").collect()[:trainNum])
-
-most_pop_rest_arr = mostPop_first_half.select("business_id").map(lambda r: r.business_id).collect()
-def addPrediction2(blah): return random.choice(most_pop_rest_arr)
-predictionAdder2 = udf(addPrediction2, StringType())
-business_graph_new = business_graph.edges.withColumn("predict_dst", predictionAdder2(business_graph.edges['src']))
-business_graph_predictions = business_graph_new.select("src","predict_dst").withColumnRenamed("predict_dst","dst")
-	
-
+# business_graph = business_graph.edges.withColumn("predict_dst",predictionAdder(business_graph.edges['user_id']))
+# new_edges = business_graph.select("src","predict_dst").withColumnRenamed("predict_dst","dst")
