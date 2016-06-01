@@ -62,11 +62,59 @@ divide_point = int(round(most_pop_rest.count() * 0.5))
 most_pop_rest1 = sqlContext.createDataFrame(most_pop_rest.orderBy("date").collect()[:divide_point])
 
 most_pop_rest1_arr = most_pop_rest1.select("business_id").map(lambda r: r.business_id).collect()
-def addPrediction(arg): return random.choice(most_pop_rest1_arr)
-predictionAdder = udf(addPrediction, StringType())
+# def addPrediction(arg): return random.choice(most_pop_rest1_arr)
+K = 2
+def addPrediction(arg): return random.sample(most_pop_rest1_arr,K)
+# predictionAdder = udf(addPrediction, StringType())
+predictionAdder = udf(addPrediction, ArrayType(StringType()))
 business_graph_new = business_graph.edges.withColumn("predict_dst", predictionAdder(business_graph.edges['src']))
-business_graph_predictions = business_graph_new.select("src","predict_dst").withColumnRenamed("predict_dst","dst")
+# business_graph_predictions = business_graph_new.select("src","predict_dst").withColumnRenamed("predict_dst","dst")
 
+test_edges = business_graph_new.filter(business_graph_new.date > '2012-04-07')
+new_edges = test_edges.select("src","predict_dst").withColumnRenamed("predict_dst","dst")
+
+# evaluation
+test_edge_index = {}
+for e in test_edges.collect():
+	if e.src in test_edge_index:
+		test_edge_index[e.src].append(e.dst)
+	else:
+		test_edge_index[e.src] = [e.dst]
+
+correct_prediction = 0
+relevant_links_count = len(test_edge_index)
+
+## Predict one link
+# predicted_links_count = new_edges.count()
+# for e in new_edges.collect():
+#     if e.src in test_edge_index:
+#         if e.dst in test_edge_index[e.src]:
+#             correct_prediction += 1
+
+## Predict more than one
+predicted_links_count = new_edges.count() * K
+for e in new_edges.collect():
+	if e.src in test_edge_index:
+		if len(e.dst) != 0:
+			for dst in e.dst:
+				if dst in test_edge_index[e.src]:
+					correct_prediction += 1
+					continue
+precision = float(correct_prediction) / predicted_links_count
+recall = float(correct_prediction) / relevant_links_count
+F1 = 2 * precision * recall / (precision + recall)
+
+print precision #1: 0.0101812 #3: 0.01017137
+print recall
+print F1
+
+'''
+1. predict 1 0.01015, 0.0262313, 0.01463544
+2. predict 2 0.010097, 0.0521985, 0.0169221
+3. predict 3 0.0102986, 0.079854, 0.018244
+predicted_links_count = 1115877
+relevant_links_count = 143912
+'''
 
 ### SOCIAL NETWORK LINK PREDICTION ###
 # user_friends_pairs_df = users.map(lambda user: (user.user_id,user.friends)).toDF(['user_id','friends'])
